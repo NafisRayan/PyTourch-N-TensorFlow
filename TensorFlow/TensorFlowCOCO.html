@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object Detection with TensorFlow.js</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+</head>
+<body class="font-sans m-0 p-5 min-h-screen bg-gray-100 overflow-x-hidden md:p-2.5 sm:p-1">
+    <h1 class="text-center text-gray-700 mb-5 text-2xl p-2.5 bg-white/90 rounded-lg shadow-sm relative z-10 md:text-xl md:mb-4 sm:text-lg sm:p-2">Object Detection with TensorFlow.js</h1>
+    <div class="relative w-full max-w-[1200px] mx-auto rounded-xl overflow-hidden shadow-md aspect-video md:rounded-lg">
+        <video id="video" class="absolute top-0 left-0 w-full h-full object-cover" autoplay></video>
+        <canvas id="canvas" class="absolute top-0 left-0 w-full h-full object-cover pointer-events-none"></canvas>
+    </div>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        async function setupCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480 },
+                audio: false
+            });
+            video.srcObject = stream;
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    resolve(video);
+                };
+            });
+        }
+
+        async function loadModel() {
+            return await cocoSsd.load();
+        }
+
+        async function detectObjects(model) {
+            const predictions = await model.detect(video);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            predictions.forEach(prediction => {
+                ctx.beginPath();
+                ctx.rect(...prediction.bbox);
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#00ff00';
+                ctx.stroke();
+                
+                // Draw background for text
+                const text = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+                ctx.font = '16px Arial';
+                const textWidth = ctx.measureText(text).width;
+                const textHeight = 20;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(
+                    prediction.bbox[0],
+                    prediction.bbox[1] > textHeight ? prediction.bbox[1] - textHeight : prediction.bbox[1],
+                    textWidth + 8,
+                    textHeight
+                );
+                
+                // Draw text
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(
+                    text,
+                    prediction.bbox[0] + 4,
+                    prediction.bbox[1] > textHeight ? prediction.bbox[1] - 5 : prediction.bbox[1] + 15
+                );
+            });
+        }
+
+        async function main() {
+            await setupCamera();
+            video.play();
+            const model = await loadModel();
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            setInterval(() => {
+                detectObjects(model);
+            }, 100);
+        }
+
+        main();
+    </script>
+</body>
+</html>
